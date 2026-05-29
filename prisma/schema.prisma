@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Platform {
+  id        String    @id @default(cuid())
+  name      String
+  icon      String?
+  color     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  accounts  Account[]
+}
+
+model Account {
+  id              String       @id @default(cuid())
+  platformId      String
+  name            String
+  username        String?
+  password        String?
+  notes           String?
+  photo           String?
+  status          String       @default("not_started")
+  totpSecret      String?
+  totalDays       Int          @default(30)
+  // WhatsApp sheet fields
+  slot            Int?
+  phone           String?
+  categoryId      String?
+  stock           Int?
+  supplier        String?
+  planPaymentDate String?
+  annotations     String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  platform        Platform     @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  category        Label?       @relation(fields: [categoryId], references: [id])
+  days            ScheduleDay[]
+  accountNotes    AccountNote[]
+}
+
+model Label {
+  id        String    @id @default(cuid())
+  name      String
+  color     String    @default("#6b7280")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  accounts  Account[]
+}
+
+model ScheduleDay {
+  id        String    @id @default(cuid())
+  accountId String
+  dayNumber Int
+  title     String
+  notes     String?
+  status    String    @default("not_started")
+  order     Int
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  account   Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+  dayNotes  DayNote[]
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  dayId       String
+  title       String
+  notes       String?
+  completed   Boolean   @default(false)
+  order       Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  day         ScheduleDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  subtasks    Subtask[]
+  taskNotes   TaskNote[]
+}
+
+model Subtask {
+  id        String   @id @default(cuid())
+  taskId    String
+  title     String
+  completed Boolean  @default(false)
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model AccountNote {
+  id        String   @id @default(cuid())
+  accountId String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model DayNote {
+  id        String      @id @default(cuid())
+  dayId     String
+  content   String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  day       ScheduleDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+}
+
+model TaskNote {
+  id        String   @id @default(cuid())
+  taskId    String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}

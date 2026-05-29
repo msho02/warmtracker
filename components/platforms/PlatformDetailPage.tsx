@@ -1,0 +1,315 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { Plus, Trash2, ArrowRight, ChevronLeft } from 'lucide-react'
+import StatusBadge from '@/components/ui/StatusBadge'
+import PlatformIcon from '@/components/ui/PlatformIcon'
+
+type Account = {
+  id: string
+  name: string
+  username: string | null
+  phone: string | null
+  status: string
+  totalDays: number
+  createdAt: string
+  days: { status: string }[]
+}
+
+type Platform = {
+  id: string
+  name: string
+  icon: string | null
+  color: string | null
+}
+
+type Props = { platformId: string }
+
+export default function PlatformDetailPage({ platformId }: Props) {
+  const [platform, setPlatform] = useState<Platform | null>(null)
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [showModal, setShowModal] = useState(false)
+  const router = useRouter()
+
+  const isWhatsApp = platform?.icon?.toLowerCase() === 'whatsapp'
+
+  const loadPlatform = () =>
+    fetch('/api/platforms')
+      .then((r) => r.json())
+      .then((all: Platform[]) => setPlatform(all.find((p) => p.id === platformId) || null))
+
+  const loadAccounts = () =>
+    fetch(`/api/accounts?platformId=${platformId}`)
+      .then((r) => r.json())
+      .then(setAccounts)
+
+  useEffect(() => {
+    loadPlatform()
+    loadAccounts()
+  }, [platformId])
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Deletar conta e todos os dados?')) return
+    await fetch(`/api/accounts/${id}`, { method: 'DELETE' })
+    loadAccounts()
+  }
+
+  const getProgress = (acc: Account) => {
+    const completed = acc.days.filter((d) => d.status === 'completed').length
+    return { completed, total: acc.totalDays, pct: acc.totalDays ? Math.round((completed / acc.totalDays) * 100) : 0 }
+  }
+
+  return (
+    <div style={{ padding: '32px', maxWidth: 960, margin: '0 auto' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
+        <button className="btn btn-ghost" style={{ padding: '4px 6px' }} onClick={() => router.push('/platforms')}>
+          <ChevronLeft size={16} />
+        </button>
+        <PlatformIcon name={platform?.icon || 'default'} size={28} />
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.025em' }}>
+            {platform?.name || '...'}
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+            {accounts.length} {accounts.length === 1 ? 'conta' : 'contas'}
+          </p>
+        </div>
+        <div style={{ flex: 1 }} />
+        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+          <Plus size={14} /> Nova conta
+        </button>
+      </div>
+
+      {accounts.length === 0 && (
+        <div className="card" style={{ padding: 48, textAlign: 'center', borderStyle: 'dashed' }}>
+          <p style={{ fontWeight: 600, marginBottom: 6 }}>Nenhuma conta</p>
+          <p style={{ color: 'var(--text-muted)', marginBottom: 20, fontSize: 13 }}>
+            Adicione sua primeira conta para começar o aquecimento.
+          </p>
+          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <Plus size={14} /> Criar conta
+          </button>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gap: 10 }}>
+        {accounts.map((acc) => {
+          const { completed, total, pct } = getProgress(acc)
+          const subtitle = isWhatsApp
+            ? acc.phone || 'Sem número'
+            : acc.username || null
+
+          return (
+            <div
+              key={acc.id}
+              className="card"
+              style={{ padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16, transition: 'box-shadow 0.15s' }}
+              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = 'var(--shadow-md)')}
+              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = '')}
+              onClick={() => router.push(`/account/${acc.id}`)}
+            >
+              <div
+                style={{
+                  width: 40, height: 40, borderRadius: 10,
+                  background: 'var(--surface-hover)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700, fontSize: 16, color: 'var(--text-secondary)',
+                  flexShrink: 0, border: '1.5px solid var(--border)',
+                }}
+              >
+                {acc.name.charAt(0).toUpperCase()}
+              </div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <p style={{ fontWeight: 600, fontSize: 14 }}>{acc.name}</p>
+                  <StatusBadge status={acc.status} />
+                </div>
+                {subtitle && (
+                  <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 2 }}>
+                    {isWhatsApp ? '📱 ' : '@'}{subtitle}
+                  </p>
+                )}
+              </div>
+
+              <div style={{ width: 120, flexShrink: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Progresso</span>
+                  <span style={{ fontSize: 11, fontWeight: 600 }}>{pct}%</span>
+                </div>
+                <div className="progress-bar">
+                  <div className="progress-fill" style={{ width: `${pct}%`, background: pct === 100 ? '#22c55e' : '#3b82f6' }} />
+                </div>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{completed}/{total} dias</p>
+              </div>
+
+              <div style={{ display: 'flex', gap: 4 }} onClick={(e) => e.stopPropagation()}>
+                <button
+                  className="btn btn-ghost"
+                  style={{ padding: '4px 6px', color: '#ef4444' }}
+                  onClick={() => handleDelete(acc.id)}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+              <ArrowRight size={14} color="var(--text-muted)" />
+            </div>
+          )
+        })}
+      </div>
+
+      {showModal && platform && (
+        <CreateAccountModal
+          platformId={platformId}
+          isWhatsApp={isWhatsApp}
+          onClose={() => setShowModal(false)}
+          onSave={(id) => { setShowModal(false); router.push(`/account/${id}`) }}
+        />
+      )}
+    </div>
+  )
+}
+
+function CreateAccountModal({
+  platformId,
+  isWhatsApp,
+  onClose,
+  onSave,
+}: {
+  platformId: string
+  isWhatsApp: boolean
+  onClose: () => void
+  onSave: (id: string) => void
+}) {
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [totalDays, setTotalDays] = useState(30)
+  const [totpSecret, setTotpSecret] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const presets = [7, 15, 30, 45, 60]
+
+  const handleSave = async () => {
+    if (!name.trim()) return
+    setLoading(true)
+    const res = await fetch('/api/accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        platformId,
+        name,
+        username: isWhatsApp ? null : email,
+        password: isWhatsApp ? null : password,
+        phone: isWhatsApp ? phone : null,
+        totalDays,
+        totpSecret: totpSecret || null,
+      }),
+    })
+    const created = await res.json()
+    setLoading(false)
+    onSave(created.id)
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+        <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 20 }}>
+          {isWhatsApp ? 'Novo número WhatsApp' : 'Nova conta'}
+        </h2>
+
+        <div style={{ marginBottom: 14 }}>
+          <label className="label">Nome da conta *</label>
+          <input
+            className="input"
+            placeholder={isWhatsApp ? 'Ex: Conta Principal, Número 01...' : 'Ex: Conta Principal...'}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus
+          />
+        </div>
+
+        {isWhatsApp ? (
+          <div style={{ marginBottom: 14 }}>
+            <label className="label">Número de telefone</label>
+            <input
+              className="input"
+              placeholder="+55 11 99999-9999"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+              <div>
+                <label className="label">Email / Login</label>
+                <input
+                  className="input"
+                  placeholder="email@exemplo.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label">Senha</label>
+                <input
+                  className="input"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label className="label">Chave TOTP (2FA) — opcional</label>
+              <input
+                className="input"
+                placeholder="Chave secreta do Google Authenticator..."
+                value={totpSecret}
+                onChange={(e) => setTotpSecret(e.target.value)}
+              />
+            </div>
+          </>
+        )}
+
+        <div style={{ marginBottom: 20 }}>
+          <label className="label">Dias de aquecimento</label>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+            {presets.map((p) => (
+              <button
+                key={p}
+                className={`btn ${totalDays === p ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ fontSize: 12, padding: '4px 12px' }}
+                onClick={() => setTotalDays(p)}
+              >
+                {p}d
+              </button>
+            ))}
+          </div>
+          <input
+            className="input"
+            type="number"
+            min={1}
+            max={365}
+            value={totalDays}
+            onChange={(e) => setTotalDays(Number(e.target.value))}
+            placeholder="Número de dias"
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={loading || !name.trim()}>
+            {loading ? 'Criando...' : isWhatsApp ? 'Criar número' : 'Criar conta'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
