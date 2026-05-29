@@ -12,6 +12,7 @@ import {
   Sun,
   Moon,
   Table2,
+  LayoutGrid,
 } from 'lucide-react'
 import PlatformIcon from '@/components/ui/PlatformIcon'
 
@@ -105,6 +106,13 @@ export default function Sidebar({ open, onToggle, theme, onToggleTheme }: Props)
           open={open}
           active={isActive('/planilha')}
           onClick={() => nav('/planilha')}
+        />
+        <SidebarItem
+          icon={<LayoutGrid size={15} />}
+          label="Kanban"
+          open={open}
+          active={isActive('/kanban')}
+          onClick={() => nav('/kanban')}
         />
 
         <div className="divider" style={{ margin: '6px 0' }} />

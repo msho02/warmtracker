@@ -47,7 +47,8 @@
       "Bash(node node_modules/prisma/build/index.js generate)",
       "Bash(powershell -Command \"Stop-Process -Name node -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2; Set-Location 'c:\\\\Users\\\\mathe\\\\OneDrive\\\\Área de Trabalho\\\\warmtracker'; node node_modules/prisma/build/index.js generate\")",
       "Bash(npx tsc *)",
-      "Bash(npx next *)"
+      "Bash(npx next *)",
+      "Bash(npx prisma *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\mathe\\OneDrive\\Área de Trabalho\\warmtracker",

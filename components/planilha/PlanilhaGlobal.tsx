@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Table2, Plus, Pencil, Save, X, Trash2, ExternalLink } from 'lucide-react'
+import { Table2, Plus, Pencil, Save, X, Trash2, ExternalLink, Tag, Eye, EyeOff } from 'lucide-react'
 import PlatformIcon from '@/components/ui/PlatformIcon'
 
-type Label = { id: string; name: string; color: string }
+type Label = { id: string; name: string; color: string; platformId: string | null }
 type Platform = { id: string; name: string; icon: string | null }
 type AccountRow = {
   id: string
@@ -34,14 +34,16 @@ const PRESET_COLORS = [
 export default function PlanilhaGlobal() {
   const router = useRouter()
   const [accounts, setAccounts] = useState<AccountRow[]>([])
-  const [labels, setLabels] = useState<Label[]>([])
+  const [allLabels, setAllLabels] = useState<Label[]>([])
   const [loading, setLoading] = useState(true)
   const [filterPlatform, setFilterPlatform] = useState<string>('all')
   const [platforms, setPlatforms] = useState<Platform[]>([])
   const [showLabelManager, setShowLabelManager] = useState(false)
+  const [labelManagerPlatformId, setLabelManagerPlatformId] = useState<string | null>(null)
   const [editingCell, setEditingCell] = useState<{ accountId: string; field: string } | null>(null)
   const [cellValues, setCellValues] = useState<Record<string, Record<string, string>>>({})
-  const [openLabelDropdown, setOpenLabelDropdown] = useState<string | null>(null)
+  const [openLabelGrid, setOpenLabelGrid] = useState<{ accountId: string; platformId: string; rect: DOMRect } | null>(null)
+  const [hideSensitive, setHideSensitive] = useState(false)
 
   const loadData = useCallback(async () => {
     const [accRes, labRes] = await Promise.all([
@@ -50,7 +52,7 @@ export default function PlanilhaGlobal() {
     ])
     const accData = await accRes.json()
     const labData = await labRes.json()
-    setLabels(labData)
+    setAllLabels(labData)
 
     const rows: AccountRow[] = accData.map((a: AccountRow & { days: { status: string }[] }) => ({
       ...a,
@@ -113,6 +115,14 @@ export default function PlanilhaGlobal() {
 
   const isWhatsApp = (a: AccountRow) => a.platform.icon?.toLowerCase() === 'whatsapp'
 
+  const labelsForPlatform = (platformId: string) =>
+    allLabels.filter(l => l.platformId === platformId)
+
+  const openLabelPicker = (accountId: string, platformId: string, e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setOpenLabelGrid({ accountId, platformId, rect })
+  }
+
   return (
     <div style={{ padding: '28px 32px', maxWidth: 1400, margin: '0 auto' }}>
       {/* Header */}
@@ -128,7 +138,16 @@ export default function PlanilhaGlobal() {
         <button
           className="btn btn-ghost"
           style={{ fontSize: 12 }}
-          onClick={() => setShowLabelManager(true)}
+          title={hideSensitive ? 'Mostrar dados sensíveis' : 'Ocultar dados sensíveis'}
+          onClick={() => setHideSensitive(v => !v)}
+        >
+          {hideSensitive ? <Eye size={13} /> : <EyeOff size={13} />}
+          {hideSensitive ? 'Mostrar dados' : 'Ocultar dados'}
+        </button>
+        <button
+          className="btn btn-ghost"
+          style={{ fontSize: 12 }}
+          onClick={() => { setLabelManagerPlatformId(filterPlatform === 'all' ? null : filterPlatform); setShowLabelManager(true) }}
         >
           <Pencil size={13} /> Gerenciar etiquetas
         </button>
@@ -164,17 +183,17 @@ export default function PlanilhaGlobal() {
           ) : filtered.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Nenhuma conta encontrada.</div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: 1200 }}>
               <colgroup>
                 <col style={{ width: 36 }} />
                 <col style={{ width: 110 }} />
                 <col style={{ width: 150 }} />
+                <col style={{ width: 160 }} />
                 <col style={{ width: 140 }} />
                 <col style={{ width: 130 }} />
-                <col style={{ width: 120 }} />
                 <col style={{ width: 80 }} />
                 <col style={{ width: 120 }} />
-                <col style={{ width: 160 }} />
+                <col style={{ width: 150 }} />
                 <col style={{ width: 160 }} />
                 <col style={{ width: 120 }} />
                 <col style={{ width: 40 }} />
@@ -192,7 +211,8 @@ export default function PlanilhaGlobal() {
                 {filtered.map((acc, idx) => {
                   const vals = cellValues[acc.id] || {}
                   const pct = acc.totalDays ? Math.round((acc.completedDays / acc.totalDays) * 100) : 0
-                  const currentLabel = labels.find(l => l.id === vals.categoryId) || acc.category
+                  const platformLabels = labelsForPlatform(acc.platform.id)
+                  const currentLabel = platformLabels.find(l => l.id === vals.categoryId) || acc.category
                   const wa = isWhatsApp(acc)
 
                   return (
@@ -222,6 +242,8 @@ export default function PlanilhaGlobal() {
                         onSave={() => saveField(acc.id, 'name', vals.name || null)}
                         onCancel={() => setEditingCell(null)}
                         placeholder="Nome"
+                        sensitive
+                        hidden={hideSensitive}
                       />
 
                       {/* Login */}
@@ -234,6 +256,8 @@ export default function PlanilhaGlobal() {
                         onCancel={() => setEditingCell(null)}
                         placeholder={wa ? '—' : 'email@exemplo.com'}
                         disabled={wa}
+                        sensitive
+                        hidden={hideSensitive}
                       />
 
                       {/* Senha */}
@@ -246,6 +270,8 @@ export default function PlanilhaGlobal() {
                         onCancel={() => setEditingCell(null)}
                         placeholder={wa ? '—' : 'Senha'}
                         disabled={wa}
+                        sensitive
+                        hidden={hideSensitive}
                       />
 
                       {/* Telefone */}
@@ -271,55 +297,23 @@ export default function PlanilhaGlobal() {
                         placeholder="—"
                       />
 
-                      {/* Categoria / etiqueta */}
+                      {/* Categoria / etiqueta — duplo clique abre mini-grid */}
                       <td style={{ padding: '8px 10px', position: 'relative' }}>
                         <div
                           style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                          onClick={() => setOpenLabelDropdown(openLabelDropdown === acc.id ? null : acc.id)}
+                          title="Duplo clique para selecionar etiqueta"
+                          onDoubleClick={e => openLabelPicker(acc.id, acc.platform.id, e)}
                         >
                           {currentLabel ? (
                             <span className="badge" style={{ background: currentLabel.color + '22', color: currentLabel.color, borderColor: currentLabel.color + '55', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                               {currentLabel.name}
                             </span>
                           ) : (
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>— Selecionar</span>
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                              <Tag size={10} /> —
+                            </span>
                           )}
                         </div>
-
-                        {openLabelDropdown === acc.id && (
-                          <>
-                            <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpenLabelDropdown(null)} />
-                            <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 50, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 180, padding: 6 }}>
-                              <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', padding: '4px 8px 6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                Selecione ou crie
-                              </p>
-                              {labels.map(l => (
-                                <div
-                                  key={l.id}
-                                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 6, cursor: 'pointer' }}
-                                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-hover)')}
-                                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                                  onClick={() => {
-                                    updateCellVal(acc.id, 'categoryId', l.id)
-                                    saveField(acc.id, 'categoryId', l.id)
-                                    setOpenLabelDropdown(null)
-                                  }}
-                                >
-                                  <span className="badge" style={{ background: l.color + '22', color: l.color, borderColor: l.color + '55', fontSize: 11, fontWeight: 600 }}>{l.name}</span>
-                                </div>
-                              ))}
-                              <div className="divider" style={{ margin: '4px 0' }} />
-                              <div
-                                style={{ padding: '6px 8px', fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer', borderRadius: 6 }}
-                                onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-hover)')}
-                                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                                onClick={() => { setOpenLabelDropdown(null); setShowLabelManager(true) }}
-                              >
-                                + Gerenciar etiquetas
-                              </div>
-                            </div>
-                          </>
-                        )}
                       </td>
 
                       {/* Fornecedor */}
@@ -383,10 +377,145 @@ export default function PlanilhaGlobal() {
         )}
       </div>
 
+      {/* Label grid popup */}
+      {openLabelGrid && (
+        <LabelGridPopup
+          accountId={openLabelGrid.accountId}
+          platformId={openLabelGrid.platformId}
+          triggerRect={openLabelGrid.rect}
+          labels={labelsForPlatform(openLabelGrid.platformId)}
+          currentCategoryId={cellValues[openLabelGrid.accountId]?.categoryId ?? ''}
+          onSelect={(labelId) => {
+            updateCellVal(openLabelGrid.accountId, 'categoryId', labelId)
+            saveField(openLabelGrid.accountId, 'categoryId', labelId)
+            setOpenLabelGrid(null)
+          }}
+          onClear={() => {
+            updateCellVal(openLabelGrid.accountId, 'categoryId', '')
+            saveField(openLabelGrid.accountId, 'categoryId', null)
+            setOpenLabelGrid(null)
+          }}
+          onManage={() => {
+            setLabelManagerPlatformId(openLabelGrid.platformId)
+            setShowLabelManager(true)
+            setOpenLabelGrid(null)
+          }}
+          onClose={() => setOpenLabelGrid(null)}
+        />
+      )}
+
       {showLabelManager && (
-        <LabelManagerModal labels={labels} onClose={() => { setShowLabelManager(false); loadData() }} />
+        <LabelManagerModal
+          platformId={labelManagerPlatformId}
+          onClose={() => { setShowLabelManager(false); loadData() }}
+        />
       )}
     </div>
+  )
+}
+
+/* ---- LABEL GRID POPUP ---- */
+function LabelGridPopup({
+  accountId,
+  platformId,
+  triggerRect,
+  labels,
+  currentCategoryId,
+  onSelect,
+  onClear,
+  onManage,
+  onClose,
+}: {
+  accountId: string
+  platformId: string
+  triggerRect: DOMRect
+  labels: Label[]
+  currentCategoryId: string
+  onSelect: (id: string) => void
+  onClear: () => void
+  onManage: () => void
+  onClose: () => void
+}) {
+  const popupRef = useRef<HTMLDivElement>(null)
+
+  const POPUP_W = 320
+  const POPUP_H = 260
+
+  const left = Math.min(triggerRect.left, window.innerWidth - POPUP_W - 8)
+  const top = triggerRect.bottom + 6 + POPUP_H > window.innerHeight
+    ? triggerRect.top - POPUP_H - 6
+    : triggerRect.bottom + 6
+
+  return (
+    <>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 100 }} onClick={onClose} />
+      <div
+        ref={popupRef}
+        style={{
+          position: 'fixed',
+          top,
+          left,
+          width: POPUP_W,
+          zIndex: 101,
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 12,
+          boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
+          padding: 14,
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Selecionar etiqueta</p>
+          <div style={{ flex: 1 }} />
+          <button className="btn btn-ghost" style={{ padding: '2px 4px' }} onClick={onClose}><X size={13} /></button>
+        </div>
+
+        {labels.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '16px 0' }}>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>Nenhuma etiqueta nesta plataforma.</p>
+            <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={onManage}>
+              <Plus size={12} /> Criar etiqueta
+            </button>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 10, maxHeight: 180, overflowY: 'auto' }}>
+              {labels.map(l => (
+                <div
+                  key={l.id}
+                  onClick={() => onSelect(l.id)}
+                  style={{
+                    padding: '6px 8px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    border: currentCategoryId === l.id ? `2px solid ${l.color}` : '2px solid transparent',
+                    background: l.color + '18',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'border-color 0.1s',
+                  }}
+                  title={l.name}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 600, color: l.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 72 }}>
+                    {l.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', gap: 6 }}>
+              <button className="btn btn-ghost" style={{ flex: 1, fontSize: 11 }} onClick={onClear}>
+                <X size={11} /> Remover
+              </button>
+              <button className="btn btn-ghost" style={{ flex: 1, fontSize: 11 }} onClick={onManage}>
+                <Pencil size={11} /> Gerenciar
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </>
   )
 }
 
@@ -401,6 +530,8 @@ function InlineCell({
   type = 'text',
   placeholder,
   disabled,
+  sensitive,
+  hidden,
 }: {
   value: string
   editing: boolean
@@ -411,6 +542,8 @@ function InlineCell({
   type?: string
   placeholder?: string
   disabled?: boolean
+  sensitive?: boolean
+  hidden?: boolean
 }) {
   if (editing) {
     return (
@@ -433,43 +566,49 @@ function InlineCell({
     )
   }
 
+  const displayValue = sensitive && hidden && value ? '••••••••' : (value || '—')
+
   return (
     <td
       style={{
         padding: '8px 10px',
         cursor: disabled ? 'default' : 'pointer',
         fontSize: 12,
-        color: (!value || value === '') ? 'var(--text-muted)' : 'var(--text-primary)',
+        color: (!value || value === '') ? 'var(--text-muted)' : (sensitive && hidden ? 'var(--text-muted)' : 'var(--text-primary)'),
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
-        maxWidth: 160,
       }}
       onDoubleClick={disabled ? undefined : onEdit}
-      title={disabled ? undefined : (value || placeholder)}
+      title={disabled ? undefined : (sensitive && hidden ? '(oculto)' : (value || placeholder))}
     >
-      {value || '—'}
+      {displayValue}
     </td>
   )
 }
 
 /* Label Manager Modal */
-function LabelManagerModal({ labels: initialLabels, onClose }: { labels: Label[]; onClose: () => void }) {
-  const [labels, setLabels] = useState<Label[]>(initialLabels)
+function LabelManagerModal({ platformId, onClose }: { platformId: string | null; onClose: () => void }) {
+  const [labels, setLabels] = useState<Label[]>([])
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState('#6b7280')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editColor, setEditColor] = useState('')
 
-  const load = () => fetch('/api/labels').then(r => r.json()).then(setLabels)
+  const load = () => {
+    const url = platformId ? `/api/labels?platformId=${platformId}` : '/api/labels'
+    fetch(url).then(r => r.json()).then(setLabels)
+  }
+
+  useEffect(() => { load() }, [platformId])
 
   const create = async () => {
     if (!newName.trim()) return
     await fetch('/api/labels', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName, color: newColor }),
+      body: JSON.stringify({ name: newName, color: newColor, platformId: platformId || null }),
     })
     setNewName('')
     load()
@@ -494,7 +633,9 @@ function LabelManagerModal({ labels: initialLabels, onClose }: { labels: Label[]
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700 }}>Gerenciar etiquetas</h2>
+          <h2 style={{ fontSize: 16, fontWeight: 700 }}>
+            Gerenciar etiquetas{platformId ? '' : ' (global)'}
+          </h2>
           <div style={{ flex: 1 }} />
           <button className="btn btn-ghost" style={{ padding: '4px 6px' }} onClick={onClose}>
             <X size={15} />

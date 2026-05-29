@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ChevronLeft,
@@ -17,6 +17,8 @@ import {
   MessageSquare,
   Pencil,
   X,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { STATUS_LABELS, formatDate } from '@/lib/utils'
 import TOTPWidget from './TOTPWidget'
@@ -127,7 +129,6 @@ export default function AccountDetailPage({ accountId }: { accountId: string }) 
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
             <PlatformIcon name={account.platform.icon || 'default'} size={13} /> {account.platform.name}
-            {account.username && ` · @${account.username}`}
             {' · '}Criado em {formatDate(account.createdAt)}
           </p>
         </div>
@@ -227,6 +228,16 @@ function Stat({ label, value, color }: { label: string; value: number; color: st
   )
 }
 
+const WA_COL_DEFAULTS = [
+  { key: 'slot',            label: 'Nº Slot',         width: 90  },
+  { key: 'phone',           label: 'Número',           width: 160 },
+  { key: 'category',        label: 'Categoria',        width: 130 },
+  { key: 'stock',           label: 'Estoque',          width: 100 },
+  { key: 'supplier',        label: 'Fornecedor',       width: 140 },
+  { key: 'planPaymentDate', label: 'Data do plano',    width: 150 },
+  { key: 'annotations',     label: 'Anotações',        width: 200 },
+]
+
 /* ---- WHATSAPP SHEET ---- */
 function WhatsAppSheet({ account, onUpdate }: { account: Account; onUpdate: () => void }) {
   const [labels, setLabels] = useState<Label[]>([])
@@ -242,9 +253,12 @@ function WhatsAppSheet({ account, onUpdate }: { account: Account; onUpdate: () =
     annotations: account.annotations ?? '',
   })
 
+  const platformId = account.platform.id
+  const { cols, renameCol, resizeCol } = useResizableCols(`wa-cols-${account.platform.id}`, WA_COL_DEFAULTS)
+
   useEffect(() => {
-    fetch('/api/labels').then(r => r.json()).then(setLabels)
-  }, [showLabelManager])
+    fetch(`/api/labels?platformId=${platformId}`).then(r => r.json()).then(setLabels)
+  }, [showLabelManager, platformId])
 
   const save = async (field: string, value: string | number | null) => {
     await fetch(`/api/accounts/${account.id}`, {
@@ -257,143 +271,231 @@ function WhatsAppSheet({ account, onUpdate }: { account: Account; onUpdate: () =
   }
 
   const currentLabel = labels.find(l => l.id === values.categoryId) || account.category
-
-  const fields = [
-    { key: 'slot', label: 'Nº Slot', type: 'number', value: values.slot },
-    { key: 'phone', label: 'Número', type: 'text', value: values.phone },
-    { key: 'category', label: 'Categoria', type: 'label', value: currentLabel },
-    { key: 'stock', label: 'Qtd. em estoque', type: 'number', value: values.stock },
-    { key: 'supplier', label: 'Fornecedor', type: 'text', value: values.supplier },
-    { key: 'planPaymentDate', label: 'Data do pagamento do plano', type: 'date', value: values.planPaymentDate },
-    { key: 'annotations', label: 'Anotações', type: 'text', value: values.annotations },
-  ]
+  const colW = (key: string) => cols.find(c => c.key === key)?.width ?? 140
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   return (
     <div className="card" style={{ overflow: 'hidden', marginBottom: 16 }}>
-      {/* Table header */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '40px 80px 1fr 120px 100px 120px 180px 1fr 40px',
-          background: 'var(--background)',
-          borderBottom: '1px solid var(--border)',
-          padding: '0',
-        }}
-      >
-        {['#', 'Nº Slot', 'Número', 'Categoria', 'Estoque', 'Fornecedor', 'Data do plano', 'Anotações', ''].map((h, i) => (
-          <div key={i} style={{ padding: '8px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            {h}
+      <div ref={scrollRef} style={{ overflowX: 'auto' }}>
+        {/* Header */}
+        <ResizableHeader
+          cols={cols}
+          onRename={renameCol}
+          onResize={resizeCol}
+          scrollRef={scrollRef}
+          extraStart={
+            <div style={{ width: 40, flexShrink: 0, padding: '8px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>#</div>
+          }
+          extraEnd={
+            <div style={{ width: 40, flexShrink: 0 }} />
+          }
+        />
+
+        {/* Single data row */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', alignItems: 'center', minHeight: 48 }}>
+          <div style={{ width: 40, flexShrink: 0, padding: '8px 10px', fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>1</div>
+
+          <div style={{ width: colW('slot'), flexShrink: 0, minWidth: 0, overflow: 'hidden' }}>
+            <EditableCell
+              value={values.slot !== '' ? String(values.slot) : '—'}
+              editing={editingField === 'slot'}
+              onEdit={() => setEditingField('slot')}
+              onSave={(v) => { setValues(p => ({ ...p, slot: v })); save('slot', v ? Number(v) : null) }}
+              onCancel={() => setEditingField(null)}
+              type="number"
+            />
           </div>
-        ))}
-      </div>
 
-      {/* Single data row */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '40px 80px 1fr 120px 100px 120px 180px 1fr 40px',
-          borderBottom: '1px solid var(--border)',
-          alignItems: 'center',
-          minHeight: 48,
-        }}
-      >
-        {/* Row number */}
-        <div style={{ padding: '8px 10px', fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>1</div>
+          <div style={{ width: colW('phone'), flexShrink: 0, minWidth: 0, overflow: 'hidden' }}>
+            <EditableCell
+              value={values.phone !== '' ? String(values.phone) : '—'}
+              editing={editingField === 'phone'}
+              onEdit={() => setEditingField('phone')}
+              onSave={(v) => { setValues(p => ({ ...p, phone: v })); save('phone', v || null) }}
+              onCancel={() => setEditingField(null)}
+              placeholder="+55 11 99999-9999"
+            />
+          </div>
 
-        {/* Slot */}
-        <EditableCell
-          value={values.slot !== '' ? String(values.slot) : '—'}
-          editing={editingField === 'slot'}
-          onEdit={() => setEditingField('slot')}
-          onSave={(v) => { setValues(p => ({ ...p, slot: v })); save('slot', v ? Number(v) : null) }}
-          onCancel={() => setEditingField(null)}
-          type="number"
-        />
+          <div style={{ width: colW('category'), flexShrink: 0, padding: '8px 10px', minWidth: 0, overflow: 'hidden' }}>
+            <LabelCell
+              label={currentLabel || null}
+              labels={labels}
+              onSelect={(id) => { setValues(p => ({ ...p, categoryId: id })); save('categoryId', id) }}
+              onClear={() => { setValues(p => ({ ...p, categoryId: '' })); save('categoryId', null) }}
+              onManage={() => setShowLabelManager(true)}
+            />
+          </div>
 
-        {/* Phone */}
-        <EditableCell
-          value={values.phone !== '' ? String(values.phone) : '—'}
-          editing={editingField === 'phone'}
-          onEdit={() => setEditingField('phone')}
-          onSave={(v) => { setValues(p => ({ ...p, phone: v })); save('phone', v || null) }}
-          onCancel={() => setEditingField(null)}
-          placeholder="+55 11 99999-9999"
-        />
+          <div style={{ width: colW('stock'), flexShrink: 0, minWidth: 0, overflow: 'hidden' }}>
+            <EditableCell
+              value={values.stock !== '' ? String(values.stock) : '—'}
+              editing={editingField === 'stock'}
+              onEdit={() => setEditingField('stock')}
+              onSave={(v) => { setValues(p => ({ ...p, stock: v })); save('stock', v ? Number(v) : null) }}
+              onCancel={() => setEditingField(null)}
+              type="number"
+            />
+          </div>
 
-        {/* Category label */}
-        <div style={{ padding: '8px 10px' }}>
-          <LabelCell
-            label={currentLabel || null}
-            labels={labels}
-            onSelect={(id) => { setValues(p => ({ ...p, categoryId: id })); save('categoryId', id) }}
-            onManage={() => setShowLabelManager(true)}
-          />
+          <div style={{ width: colW('supplier'), flexShrink: 0, minWidth: 0, overflow: 'hidden' }}>
+            <EditableCell
+              value={values.supplier !== '' ? String(values.supplier) : '—'}
+              editing={editingField === 'supplier'}
+              onEdit={() => setEditingField('supplier')}
+              onSave={(v) => { setValues(p => ({ ...p, supplier: v })); save('supplier', v || null) }}
+              onCancel={() => setEditingField(null)}
+              placeholder="Nome do fornecedor"
+            />
+          </div>
+
+          <div style={{ width: colW('planPaymentDate'), flexShrink: 0, minWidth: 0, overflow: 'hidden' }}>
+            <EditableCell
+              value={values.planPaymentDate !== '' ? String(values.planPaymentDate) : '—'}
+              editing={editingField === 'planPaymentDate'}
+              onEdit={() => setEditingField('planPaymentDate')}
+              onSave={(v) => { setValues(p => ({ ...p, planPaymentDate: v })); save('planPaymentDate', v || null) }}
+              onCancel={() => setEditingField(null)}
+              type="date"
+            />
+          </div>
+
+          <div style={{ width: colW('annotations'), flexShrink: 0, minWidth: 0, overflow: 'hidden' }}>
+            <EditableCell
+              value={values.annotations !== '' ? String(values.annotations) : '—'}
+              editing={editingField === 'annotations'}
+              onEdit={() => setEditingField('annotations')}
+              onSave={(v) => { setValues(p => ({ ...p, annotations: v })); save('annotations', v || null) }}
+              onCancel={() => setEditingField(null)}
+              placeholder="Anotações..."
+            />
+          </div>
+
+          <div style={{ width: 40, flexShrink: 0, padding: '8px 6px', display: 'flex', justifyContent: 'center' }}>
+            <button className="btn btn-ghost" style={{ padding: '3px 5px' }} onClick={() => setEditingField(editingField ? null : 'phone')}>
+              <Pencil size={12} />
+            </button>
+          </div>
         </div>
 
-        {/* Stock */}
-        <EditableCell
-          value={values.stock !== '' ? String(values.stock) : '—'}
-          editing={editingField === 'stock'}
-          onEdit={() => setEditingField('stock')}
-          onSave={(v) => { setValues(p => ({ ...p, stock: v })); save('stock', v ? Number(v) : null) }}
-          onCancel={() => setEditingField(null)}
-          type="number"
-        />
-
-        {/* Supplier */}
-        <EditableCell
-          value={values.supplier !== '' ? String(values.supplier) : '—'}
-          editing={editingField === 'supplier'}
-          onEdit={() => setEditingField('supplier')}
-          onSave={(v) => { setValues(p => ({ ...p, supplier: v })); save('supplier', v || null) }}
-          onCancel={() => setEditingField(null)}
-          placeholder="Nome do fornecedor"
-        />
-
-        {/* Plan payment date */}
-        <EditableCell
-          value={values.planPaymentDate !== '' ? String(values.planPaymentDate) : '—'}
-          editing={editingField === 'planPaymentDate'}
-          onEdit={() => setEditingField('planPaymentDate')}
-          onSave={(v) => { setValues(p => ({ ...p, planPaymentDate: v })); save('planPaymentDate', v || null) }}
-          onCancel={() => setEditingField(null)}
-          type="date"
-        />
-
-        {/* Annotations */}
-        <EditableCell
-          value={values.annotations !== '' ? String(values.annotations) : '—'}
-          editing={editingField === 'annotations'}
-          onEdit={() => setEditingField('annotations')}
-          onSave={(v) => { setValues(p => ({ ...p, annotations: v })); save('annotations', v || null) }}
-          onCancel={() => setEditingField(null)}
-          placeholder="Anotações..."
-        />
-
-        {/* Edit button */}
-        <div style={{ padding: '8px 6px', display: 'flex', justifyContent: 'center' }}>
-          <button
-            className="btn btn-ghost"
-            style={{ padding: '3px 5px' }}
-            onClick={() => setEditingField(editingField ? null : 'phone')}
-          >
-            <Pencil size={12} />
-          </button>
+        <div style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>SOMA</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>1</span>
         </div>
       </div>
 
-      {/* Footer sum */}
-      <div style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          SOMA
-        </span>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>1</span>
-      </div>
-
-      {/* Label manager modal */}
       {showLabelManager && (
-        <LabelManagerModal onClose={() => setShowLabelManager(false)} />
+        <LabelManagerModal platformId={platformId} onClose={() => setShowLabelManager(false)} />
       )}
+    </div>
+  )
+}
+
+/* ---- RESIZABLE COLUMN HEADER ---- */
+function useResizableCols(storageKey: string, defaults: { key: string; label: string; width: number }[]) {
+  const [cols, setCols] = useState(() => {
+    try {
+      const saved = localStorage.getItem(storageKey)
+      if (saved) {
+        const parsed = JSON.parse(saved) as { key: string; label: string; width: number }[]
+        // merge: keep saved widths/labels but preserve structure from defaults
+        return defaults.map(d => {
+          const s = parsed.find(p => p.key === d.key)
+          return s ? { ...d, label: s.label, width: s.width } : d
+        })
+      }
+    } catch {}
+    return defaults
+  })
+
+  const persist = (next: typeof cols) => {
+    setCols(next)
+    try { localStorage.setItem(storageKey, JSON.stringify(next)) } catch {}
+  }
+
+  const renameCol = (key: string, label: string) => {
+    persist(cols.map(c => c.key === key ? { ...c, label } : c))
+  }
+
+  const resizeCol = (key: string, delta: number) => {
+    persist(cols.map(c => c.key === key ? { ...c, width: Math.max(60, c.width + delta) } : c))
+  }
+
+  return { cols, renameCol, resizeCol }
+}
+
+function ResizableHeader({
+  cols,
+  onRename,
+  onResize,
+  scrollRef,
+  extraStart,
+  extraEnd,
+}: {
+  cols: { key: string; label: string; width: number }[]
+  onRename: (key: string, label: string) => void
+  onResize: (key: string, delta: number) => void
+  scrollRef?: React.RefObject<HTMLDivElement | null>
+  extraStart?: React.ReactNode
+  extraEnd?: React.ReactNode
+}) {
+  const [editingKey, setEditingKey] = useState<string | null>(null)
+  const [editLabel, setEditLabel] = useState('')
+
+  const startResize = (key: string, startX: number) => {
+    // Disable scroll on the container while dragging so horizontal mouse movement
+    // doesn't get eaten by the overflow scroll instead of resizing the column.
+    const el = scrollRef?.current
+    if (el) el.style.overflowX = 'hidden'
+
+    let lastX = startX
+    const onMove = (e: MouseEvent) => { onResize(key, e.clientX - lastX); lastX = e.clientX }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      if (el) el.style.overflowX = 'auto'
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
+  return (
+    <div style={{ display: 'flex', background: 'var(--background)', borderBottom: '1px solid var(--border)', userSelect: 'none' }}>
+      {extraStart}
+      {cols.map(col => (
+        <div key={col.key} style={{ position: 'relative', width: col.width, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+          {editingKey === col.key ? (
+            <input
+              autoFocus
+              value={editLabel}
+              onChange={e => setEditLabel(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { onRename(col.key, editLabel || col.label); setEditingKey(null) }
+                if (e.key === 'Escape') setEditingKey(null)
+              }}
+              onBlur={() => { onRename(col.key, editLabel || col.label); setEditingKey(null) }}
+              style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 4, padding: '2px 6px', width: '100%', outline: 'none', textTransform: 'uppercase', letterSpacing: '0.04em' }}
+            />
+          ) : (
+            <span
+              onDoubleClick={() => { setEditingKey(col.key); setEditLabel(col.label) }}
+              title="Duplo clique para renomear"
+              style={{ padding: '8px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'default', flex: 1 }}
+            >
+              {col.label}
+            </span>
+          )}
+          {/* Resize handle */}
+          <div
+            onMouseDown={e => { e.preventDefault(); startResize(col.key, e.clientX) }}
+            style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 6, cursor: 'col-resize', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}
+            title="Arraste para redimensionar"
+          >
+            <div style={{ width: 2, height: 14, borderRadius: 1, background: 'var(--border)' }} />
+          </div>
+        </div>
+      ))}
+      {extraEnd}
     </div>
   )
 }
@@ -407,6 +509,8 @@ function EditableCell({
   onCancel,
   type = 'text',
   placeholder,
+  sensitive,
+  hidden,
 }: {
   value: string
   editing: boolean
@@ -415,6 +519,8 @@ function EditableCell({
   onCancel: () => void
   type?: string
   placeholder?: string
+  sensitive?: boolean
+  hidden?: boolean
 }) {
   const [local, setLocal] = useState(value === '—' ? '' : value)
 
@@ -443,49 +549,62 @@ function EditableCell({
     )
   }
 
+  const displayValue = sensitive && hidden && value !== '—' ? '••••••••' : value
+
   return (
     <div
-      style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 13, color: value === '—' ? 'var(--text-muted)' : 'var(--text-primary)' }}
+      style={{
+        padding: '8px 10px',
+        cursor: 'pointer',
+        fontSize: 13,
+        color: value === '—' ? 'var(--text-muted)' : (sensitive && hidden ? 'var(--text-muted)' : 'var(--text-primary)'),
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+      }}
       onDoubleClick={onEdit}
-      title="Duplo clique para editar"
+      title={sensitive && hidden ? '(oculto)' : (value === '—' ? 'Duplo clique para editar' : value)}
     >
-      {value}
+      {displayValue}
     </div>
   )
 }
 
-/* Label selector cell */
+/* Label selector cell — mini-grid popup posicionado na viewport */
 function LabelCell({
   label,
   labels,
   onSelect,
+  onClear,
   onManage,
 }: {
   label: Label | null
   labels: Label[]
   onSelect: (id: string) => void
+  onClear: () => void
   onManage: () => void
 }) {
-  const [open, setOpen] = useState(false)
+  const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(null)
+  const POPUP_W = 300
+  const POPUP_H = 240
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (popupPos) { setPopupPos(null); return }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const top = rect.bottom + 6 + POPUP_H > window.innerHeight ? rect.top - POPUP_H - 6 : rect.bottom + 6
+    const left = Math.min(rect.left, window.innerWidth - POPUP_W - 8)
+    setPopupPos({ top, left })
+  }
 
   return (
-    <div style={{ position: 'relative' }}>
+    <>
       <div
         style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-        onClick={() => setOpen(!open)}
+        onClick={handleClick}
+        title="Clique para selecionar etiqueta"
       >
         {label ? (
-          <span
-            className="badge"
-            style={{
-              background: label.color + '22',
-              color: label.color,
-              borderColor: label.color + '55',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
+          <span className="badge" style={{ background: label.color + '22', color: label.color, borderColor: label.color + '55', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
             {label.name}
           </span>
         ) : (
@@ -493,73 +612,86 @@ function LabelCell({
         )}
       </div>
 
-      {open && (
+      {popupPos && (
         <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpen(false)} />
+          <div style={{ position: 'fixed', inset: 0, zIndex: 100 }} onClick={() => setPopupPos(null)} />
           <div
             style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              zIndex: 50,
+              position: 'fixed',
+              top: popupPos.top,
+              left: popupPos.left,
+              width: POPUP_W,
+              zIndex: 101,
               background: 'var(--surface)',
               border: '1px solid var(--border)',
-              borderRadius: 8,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-              minWidth: 180,
-              padding: 6,
+              borderRadius: 12,
+              boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
+              padding: 14,
             }}
+            onClick={e => e.stopPropagation()}
           >
-            <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', padding: '4px 8px 6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Selecione uma opção ou crie uma
-            </p>
-            {labels.map(l => (
-              <div
-                key={l.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '6px 8px',
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-hover)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                onClick={() => { onSelect(l.id); setOpen(false) }}
-              >
-                <span
-                  className="badge"
-                  style={{
-                    background: l.color + '22',
-                    color: l.color,
-                    borderColor: l.color + '55',
-                    fontSize: 12,
-                    fontWeight: 600,
-                  }}
-                >
-                  {l.name}
-                </span>
-              </div>
-            ))}
-            <div className="divider" style={{ margin: '4px 0' }} />
-            <div
-              style={{ padding: '6px 8px', fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer', borderRadius: 6 }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-hover)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              onClick={() => { setOpen(false); onManage() }}
-            >
-              + Gerenciar etiquetas
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Selecionar etiqueta</p>
+              <div style={{ flex: 1 }} />
+              <button className="btn btn-ghost" style={{ padding: '2px 4px' }} onClick={() => setPopupPos(null)}>
+                <X size={13} />
+              </button>
             </div>
+
+            {labels.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '12px 0' }}>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+                  Nenhuma etiqueta nesta plataforma.
+                </p>
+                <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => { setPopupPos(null); onManage() }}>
+                  <Plus size={12} /> Criar etiqueta
+                </button>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 10, maxHeight: 160, overflowY: 'auto' }}>
+                  {labels.map(l => (
+                    <div
+                      key={l.id}
+                      onClick={() => { onSelect(l.id); setPopupPos(null) }}
+                      style={{
+                        padding: '6px 8px',
+                        borderRadius: 8,
+                        cursor: 'pointer',
+                        border: label?.id === l.id ? `2px solid ${l.color}` : '2px solid transparent',
+                        background: l.color + '18',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'border-color 0.1s',
+                      }}
+                      title={l.name}
+                    >
+                      <span style={{ fontSize: 12, fontWeight: 600, color: l.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 68 }}>
+                        {l.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', gap: 6 }}>
+                  <button className="btn btn-ghost" style={{ flex: 1, fontSize: 11 }} onClick={() => { onClear(); setPopupPos(null) }}>
+                    <X size={11} /> Remover
+                  </button>
+                  <button className="btn btn-ghost" style={{ flex: 1, fontSize: 11 }} onClick={() => { setPopupPos(null); onManage() }}>
+                    <Pencil size={11} /> Gerenciar
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </>
       )}
-    </div>
+    </>
   )
 }
 
 /* Label manager modal */
-function LabelManagerModal({ onClose }: { onClose: () => void }) {
+function LabelManagerModal({ platformId, onClose }: { platformId: string; onClose: () => void }) {
   const [labels, setLabels] = useState<Label[]>([])
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState('#6b7280')
@@ -572,15 +704,15 @@ function LabelManagerModal({ onClose }: { onClose: () => void }) {
     '#8b5cf6', '#ec4899', '#6b7280', '#14b8a6', '#0ea5e9',
   ]
 
-  const load = () => fetch('/api/labels').then(r => r.json()).then(setLabels)
-  useEffect(() => { load() }, [])
+  const load = () => fetch(`/api/labels?platformId=${platformId}`).then(r => r.json()).then(setLabels)
+  useEffect(() => { load() }, [platformId])
 
   const create = async () => {
     if (!newName.trim()) return
     await fetch('/api/labels', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName, color: newColor }),
+      body: JSON.stringify({ name: newName, color: newColor, platformId }),
     })
     setNewName('')
     load()
@@ -1109,10 +1241,20 @@ function TaskItem({
 }
 
 /* ---- SHEET VIEW (non-WhatsApp) — planilha de dados da conta ---- */
+const SHEET_COL_DEFAULTS = [
+  { key: 'name',       label: 'Nome da Conta',  width: 180 },
+  { key: 'username',   label: 'Login / Email',  width: 200 },
+  { key: 'password',   label: 'Senha',          width: 160 },
+  { key: 'category',   label: 'Categoria',      width: 140 },
+  { key: 'annotations',label: 'Anotações',      width: 200 },
+  { key: 'progress',   label: 'Progresso',      width: 130 },
+]
+
 function SheetView({ account, onUpdate }: { account: Account; onUpdate: () => void }) {
   const [labels, setLabels] = useState<Label[]>([])
   const [showLabelManager, setShowLabelManager] = useState(false)
   const [editingField, setEditingField] = useState<string | null>(null)
+  const [hideSensitive, setHideSensitive] = useState(false)
   const [values, setValues] = useState({
     name: account.name,
     username: account.username ?? '',
@@ -1121,9 +1263,12 @@ function SheetView({ account, onUpdate }: { account: Account; onUpdate: () => vo
     annotations: account.annotations ?? '',
   })
 
+  const platformId = account.platform.id
+  const { cols, renameCol, resizeCol } = useResizableCols(`sheet-cols-${account.platform.id}`, SHEET_COL_DEFAULTS)
+
   useEffect(() => {
-    fetch('/api/labels').then(r => r.json()).then(setLabels)
-  }, [showLabelManager])
+    fetch(`/api/labels?platformId=${platformId}`).then(r => r.json()).then(setLabels)
+  }, [showLabelManager, platformId])
 
   const save = async (field: string, value: string | null) => {
     await fetch(`/api/accounts/${account.id}`, {
@@ -1136,120 +1281,125 @@ function SheetView({ account, onUpdate }: { account: Account; onUpdate: () => vo
   }
 
   const currentLabel = labels.find(l => l.id === values.categoryId) || account.category
-
   const completedDays = account.days.filter(d => d.status === 'completed').length
   const pct = account.totalDays ? Math.round((completedDays / account.totalDays) * 100) : 0
 
+  const colW = (key: string) => cols.find(c => c.key === key)?.width ?? 160
+  const scrollRef = useRef<HTMLDivElement>(null)
+
   return (
     <div className="card" style={{ overflow: 'hidden', marginBottom: 16 }}>
-      {/* Header */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '40px 1fr 1fr 1fr 140px 1fr 120px 40px',
-          background: 'var(--background)',
-          borderBottom: '1px solid var(--border)',
-        }}
-      >
-        {['#', 'Nome da Conta', 'Login / Email', 'Senha', 'Categoria', 'Anotações', 'Progresso', ''].map((h, i) => (
-          <div key={i} style={{ padding: '8px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            {h}
-          </div>
-        ))}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
+        <button
+          className="btn btn-ghost"
+          style={{ fontSize: 12 }}
+          title={hideSensitive ? 'Mostrar dados sensíveis' : 'Ocultar dados sensíveis'}
+          onClick={() => setHideSensitive(v => !v)}
+        >
+          {hideSensitive ? <Eye size={13} /> : <EyeOff size={13} />}
+          {hideSensitive ? 'Mostrar dados' : 'Ocultar dados'}
+        </button>
       </div>
-
-      {/* Data row */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '40px 1fr 1fr 1fr 140px 1fr 120px 40px',
-          borderBottom: '1px solid var(--border)',
-          alignItems: 'center',
-          minHeight: 48,
-        }}
-      >
-        <div style={{ padding: '8px 10px', fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>1</div>
-
-        {/* Nome */}
-        <EditableCell
-          value={values.name || '—'}
-          editing={editingField === 'name'}
-          onEdit={() => setEditingField('name')}
-          onSave={(v) => { setValues(p => ({ ...p, name: v })); save('name', v || null) }}
-          onCancel={() => setEditingField(null)}
-          placeholder="Nome da conta"
+      <div ref={scrollRef} style={{ overflowX: 'auto' }}>
+        {/* Header */}
+        <ResizableHeader
+          cols={cols}
+          onRename={renameCol}
+          onResize={resizeCol}
+          scrollRef={scrollRef}
+          extraStart={
+            <div style={{ width: 40, flexShrink: 0, padding: '8px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>#</div>
+          }
+          extraEnd={
+            <div style={{ width: 40, flexShrink: 0 }} />
+          }
         />
 
-        {/* Login */}
-        <EditableCell
-          value={values.username !== '' ? values.username : '—'}
-          editing={editingField === 'username'}
-          onEdit={() => setEditingField('username')}
-          onSave={(v) => { setValues(p => ({ ...p, username: v })); save('username', v || null) }}
-          onCancel={() => setEditingField(null)}
-          placeholder="email@exemplo.com"
-        />
+        {/* Data row */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', alignItems: 'center', minHeight: 48 }}>
+          <div style={{ width: 40, flexShrink: 0, padding: '8px 10px', fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>1</div>
 
-        {/* Senha */}
-        <EditableCell
-          value={values.password !== '' ? values.password : '—'}
-          editing={editingField === 'password'}
-          onEdit={() => setEditingField('password')}
-          onSave={(v) => { setValues(p => ({ ...p, password: v })); save('password', v || null) }}
-          onCancel={() => setEditingField(null)}
-          placeholder="Senha..."
-        />
-
-        {/* Categoria / etiqueta */}
-        <div style={{ padding: '8px 10px' }}>
-          <LabelCell
-            label={currentLabel || null}
-            labels={labels}
-            onSelect={(id) => { setValues(p => ({ ...p, categoryId: id })); save('categoryId', id) }}
-            onManage={() => setShowLabelManager(true)}
-          />
-        </div>
-
-        {/* Anotações */}
-        <EditableCell
-          value={values.annotations !== '' ? values.annotations : '—'}
-          editing={editingField === 'annotations'}
-          onEdit={() => setEditingField('annotations')}
-          onSave={(v) => { setValues(p => ({ ...p, annotations: v })); save('annotations', v || null) }}
-          onCancel={() => setEditingField(null)}
-          placeholder="Anotações..."
-        />
-
-        {/* Progresso */}
-        <div style={{ padding: '8px 10px' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: pct === 100 ? '#22c55e' : 'var(--text-primary)', marginBottom: 4 }}>{pct}%</div>
-          <div className="progress-bar">
-            <div className="progress-fill" style={{ width: `${pct}%`, background: pct === 100 ? '#22c55e' : '#3b82f6' }} />
+          <div style={{ width: colW('name'), flexShrink: 0, minWidth: 0, overflow: 'hidden' }}>
+            <EditableCell
+              value={values.name || '—'}
+              editing={editingField === 'name'}
+              onEdit={() => setEditingField('name')}
+              onSave={(v) => { setValues(p => ({ ...p, name: v })); save('name', v || null) }}
+              onCancel={() => setEditingField(null)}
+              placeholder="Nome da conta"
+            />
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{completedDays}/{account.totalDays} dias</div>
+
+          <div style={{ width: colW('username'), flexShrink: 0, minWidth: 0, overflow: 'hidden' }}>
+            <EditableCell
+              value={values.username !== '' ? values.username : '—'}
+              editing={editingField === 'username'}
+              onEdit={() => setEditingField('username')}
+              onSave={(v) => { setValues(p => ({ ...p, username: v })); save('username', v || null) }}
+              onCancel={() => setEditingField(null)}
+              placeholder="email@exemplo.com"
+              sensitive
+              hidden={hideSensitive}
+            />
+          </div>
+
+          <div style={{ width: colW('password'), flexShrink: 0, minWidth: 0, overflow: 'hidden' }}>
+            <EditableCell
+              value={values.password !== '' ? values.password : '—'}
+              editing={editingField === 'password'}
+              onEdit={() => setEditingField('password')}
+              onSave={(v) => { setValues(p => ({ ...p, password: v })); save('password', v || null) }}
+              onCancel={() => setEditingField(null)}
+              placeholder="Senha..."
+              sensitive
+              hidden={hideSensitive}
+            />
+          </div>
+
+          <div style={{ width: colW('category'), flexShrink: 0, padding: '8px 10px' }}>
+            <LabelCell
+              label={currentLabel || null}
+              labels={labels}
+              onSelect={(id) => { setValues(p => ({ ...p, categoryId: id })); save('categoryId', id) }}
+              onClear={() => { setValues(p => ({ ...p, categoryId: '' })); save('categoryId', null) }}
+              onManage={() => setShowLabelManager(true)}
+            />
+          </div>
+
+          <div style={{ width: colW('annotations'), flexShrink: 0, minWidth: 0, overflow: 'hidden' }}>
+            <EditableCell
+              value={values.annotations !== '' ? values.annotations : '—'}
+              editing={editingField === 'annotations'}
+              onEdit={() => setEditingField('annotations')}
+              onSave={(v) => { setValues(p => ({ ...p, annotations: v })); save('annotations', v || null) }}
+              onCancel={() => setEditingField(null)}
+              placeholder="Anotações..."
+            />
+          </div>
+
+          <div style={{ width: colW('progress'), flexShrink: 0, padding: '8px 10px', minWidth: 0, overflow: 'hidden' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: pct === 100 ? '#22c55e' : 'var(--text-primary)', marginBottom: 4 }}>{pct}%</div>
+            <div className="progress-bar">
+              <div className="progress-fill" style={{ width: `${pct}%`, background: pct === 100 ? '#22c55e' : '#3b82f6' }} />
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{completedDays}/{account.totalDays} dias</div>
+          </div>
+
+          <div style={{ width: 40, flexShrink: 0, padding: '8px 6px', display: 'flex', justifyContent: 'center' }}>
+            <button className="btn btn-ghost" style={{ padding: '3px 5px' }} onClick={() => setEditingField(editingField ? null : 'name')}>
+              <Pencil size={12} />
+            </button>
+          </div>
         </div>
 
-        {/* Edit button */}
-        <div style={{ padding: '8px 6px', display: 'flex', justifyContent: 'center' }}>
-          <button
-            className="btn btn-ghost"
-            style={{ padding: '3px 5px' }}
-            onClick={() => setEditingField(editingField ? null : 'name')}
-          >
-            <Pencil size={12} />
-          </button>
+        <div style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>SOMA</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>1</span>
         </div>
-      </div>
-
-      <div style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          SOMA
-        </span>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>1</span>
       </div>
 
       {showLabelManager && (
-        <LabelManagerModal onClose={() => setShowLabelManager(false)} />
+        <LabelManagerModal platformId={platformId} onClose={() => setShowLabelManager(false)} />
       )}
     </div>
   )

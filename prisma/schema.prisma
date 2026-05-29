@@ -15,6 +15,7 @@ model Platform {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   accounts  Account[]
+  labels    Label[]
 }
 
 model Account {
@@ -45,12 +46,14 @@ model Account {
 }
 
 model Label {
-  id        String    @id @default(cuid())
-  name      String
-  color     String    @default("#6b7280")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  accounts  Account[]
+  id         String    @id @default(cuid())
+  name       String
+  color      String    @default("#6b7280")
+  platformId String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  platform   Platform? @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  accounts   Account[]
 }
 
 model ScheduleDay {
@@ -118,4 +121,57 @@ model TaskNote {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model KanbanBoard {
+  id        String         @id @default(cuid())
+  name      String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  columns   KanbanColumn[]
+}
+
+model KanbanColumn {
+  id        String       @id @default(cuid())
+  boardId   String
+  title     String
+  position  Int          @default(0)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  board     KanbanBoard  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards     KanbanCard[]
+}
+
+model KanbanCard {
+  id                String          @id @default(cuid())
+  columnId          String
+  title             String
+  description       String?
+  platform          String?
+  priority          String          @default("medium")
+  accountName       String?
+  username          String?
+  phoneOrIdentifier String?
+  niche             String?
+  notes             String?
+  tags              String          @default("[]")
+  dueDate           String?
+  warmupStartDate   String?
+  warmupEndDate     String?
+  position          Int             @default(0)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  column            KanbanColumn    @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  checklistItems    KanbanChecklist[]
+}
+
+model KanbanChecklist {
+  id        String     @id @default(cuid())
+  cardId    String
+  text      String
+  completed Boolean    @default(false)
+  position  Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  card      KanbanCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
 }
