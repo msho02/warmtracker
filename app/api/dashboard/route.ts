@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
 export async function GET() {
+  try {
   const [totalAccounts, byStatus, platforms, accounts] = await Promise.all([
     prisma.account.count(),
     prisma.account.groupBy({ by: ['status'], _count: true }),
@@ -67,4 +68,8 @@ export async function GET() {
     todayTasks,
     today: today.toISOString(),
   })
+  } catch (err) {
+    console.error('[dashboard] DB error:', err)
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
 }
