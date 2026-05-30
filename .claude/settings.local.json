@@ -56,7 +56,13 @@
       "Bash(rm \"c:/Users/mathe/OneDrive/Área de Trabalho/warmtracker/app/account/[id]/page.tsx\")",
       "Bash(rmdir \"c:/Users/mathe/OneDrive/Área de Trabalho/warmtracker/app/platform/[id]\")",
       "Bash(rmdir \"c:/Users/mathe/OneDrive/Área de Trabalho/warmtracker/app/account/[id]\")",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(npm install *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(git rm *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\mathe\\OneDrive\\Área de Trabalho\\warmtracker",
