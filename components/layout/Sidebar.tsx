@@ -12,7 +12,7 @@ import {
   Sun,
   Moon,
   Table2,
-  LayoutGrid,
+  LogOut,
 } from 'lucide-react'
 import PlatformIcon from '@/components/ui/PlatformIcon'
 
@@ -107,14 +107,6 @@ export default function Sidebar({ open, onToggle, theme, onToggleTheme }: Props)
           active={isActive('/planilha')}
           onClick={() => nav('/planilha')}
         />
-        <SidebarItem
-          icon={<LayoutGrid size={15} />}
-          label="Kanban"
-          open={open}
-          active={isActive('/kanban')}
-          onClick={() => nav('/kanban')}
-        />
-
         <div className="divider" style={{ margin: '6px 0' }} />
 
         {/* Platforms section */}
@@ -204,6 +196,17 @@ export default function Sidebar({ open, onToggle, theme, onToggleTheme }: Props)
           open={open}
           active={isActive('/platforms')}
           onClick={() => nav('/platforms')}
+        />
+        <SidebarItem
+          icon={<LogOut size={15} />}
+          label="Sair"
+          open={open}
+          active={false}
+          muted
+          onClick={async () => {
+            await fetch('/api/auth/logout', { method: 'POST' })
+            nav('/login')
+          }}
         />
       </div>
     </aside>

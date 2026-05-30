@@ -113,6 +113,10 @@ export default function PlanilhaGlobal() {
     ? accounts
     : accounts.filter(a => a.platform.id === filterPlatform)
 
+  const platformGroups = filterPlatform === 'all'
+    ? platforms.map(p => ({ platform: p, accounts: accounts.filter(a => a.platform.id === p.id) })).filter(g => g.accounts.length > 0)
+    : null
+
   const isWhatsApp = (a: AccountRow) => a.platform.icon?.toLowerCase() === 'whatsapp'
 
   const labelsForPlatform = (platformId: string) =>
@@ -175,207 +179,72 @@ export default function PlanilhaGlobal() {
         ))}
       </div>
 
-      {/* Table */}
-      <div className="card" style={{ overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Carregando...</div>
-          ) : filtered.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Nenhuma conta encontrada.</div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: 1200 }}>
-              <colgroup>
-                <col style={{ width: 36 }} />
-                <col style={{ width: 110 }} />
-                <col style={{ width: 150 }} />
-                <col style={{ width: 160 }} />
-                <col style={{ width: 140 }} />
-                <col style={{ width: 130 }} />
-                <col style={{ width: 80 }} />
-                <col style={{ width: 120 }} />
-                <col style={{ width: 150 }} />
-                <col style={{ width: 160 }} />
-                <col style={{ width: 120 }} />
-                <col style={{ width: 40 }} />
-              </colgroup>
-              <thead>
-                <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
-                  {['#', 'Plataforma', 'Nome da Conta', 'Login / Email', 'Senha', 'Telefone', 'Slot', 'Categoria', 'Fornecedor', 'Anotações', 'Progresso', ''].map((h, i) => (
-                    <th key={i} style={{ padding: '8px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'left', whiteSpace: 'nowrap' }}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((acc, idx) => {
-                  const vals = cellValues[acc.id] || {}
-                  const pct = acc.totalDays ? Math.round((acc.completedDays / acc.totalDays) * 100) : 0
-                  const platformLabels = labelsForPlatform(acc.platform.id)
-                  const currentLabel = platformLabels.find(l => l.id === vals.categoryId) || acc.category
-                  const wa = isWhatsApp(acc)
-
-                  return (
-                    <tr
-                      key={acc.id}
-                      style={{ borderBottom: '1px solid var(--border)' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-hover)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      {/* # */}
-                      <td style={{ padding: '8px 10px', fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>{idx + 1}</td>
-
-                      {/* Platform */}
-                      <td style={{ padding: '8px 10px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <PlatformIcon name={acc.platform.icon || 'default'} size={14} />
-                          <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{acc.platform.name}</span>
-                        </div>
-                      </td>
-
-                      {/* Nome */}
-                      <InlineCell
-                        value={vals.name}
-                        editing={editingCell?.accountId === acc.id && editingCell.field === 'name'}
-                        onEdit={() => setEditingCell({ accountId: acc.id, field: 'name' })}
-                        onChange={v => updateCellVal(acc.id, 'name', v)}
-                        onSave={() => saveField(acc.id, 'name', vals.name || null)}
-                        onCancel={() => setEditingCell(null)}
-                        placeholder="Nome"
-                        sensitive
-                        hidden={hideSensitive}
-                      />
-
-                      {/* Login */}
-                      <InlineCell
-                        value={vals.username}
-                        editing={editingCell?.accountId === acc.id && editingCell.field === 'username'}
-                        onEdit={() => !wa && setEditingCell({ accountId: acc.id, field: 'username' })}
-                        onChange={v => updateCellVal(acc.id, 'username', v)}
-                        onSave={() => saveField(acc.id, 'username', vals.username || null)}
-                        onCancel={() => setEditingCell(null)}
-                        placeholder={wa ? '—' : 'email@exemplo.com'}
-                        disabled={wa}
-                        sensitive
-                        hidden={hideSensitive}
-                      />
-
-                      {/* Senha */}
-                      <InlineCell
-                        value={vals.password}
-                        editing={editingCell?.accountId === acc.id && editingCell.field === 'password'}
-                        onEdit={() => !wa && setEditingCell({ accountId: acc.id, field: 'password' })}
-                        onChange={v => updateCellVal(acc.id, 'password', v)}
-                        onSave={() => saveField(acc.id, 'password', vals.password || null)}
-                        onCancel={() => setEditingCell(null)}
-                        placeholder={wa ? '—' : 'Senha'}
-                        disabled={wa}
-                        sensitive
-                        hidden={hideSensitive}
-                      />
-
-                      {/* Telefone */}
-                      <InlineCell
-                        value={vals.phone}
-                        editing={editingCell?.accountId === acc.id && editingCell.field === 'phone'}
-                        onEdit={() => setEditingCell({ accountId: acc.id, field: 'phone' })}
-                        onChange={v => updateCellVal(acc.id, 'phone', v)}
-                        onSave={() => saveField(acc.id, 'phone', vals.phone || null)}
-                        onCancel={() => setEditingCell(null)}
-                        placeholder="+55 11 99999-9999"
-                      />
-
-                      {/* Slot */}
-                      <InlineCell
-                        value={vals.slot}
-                        editing={editingCell?.accountId === acc.id && editingCell.field === 'slot'}
-                        onEdit={() => setEditingCell({ accountId: acc.id, field: 'slot' })}
-                        onChange={v => updateCellVal(acc.id, 'slot', v)}
-                        onSave={() => saveField(acc.id, 'slot', vals.slot ? Number(vals.slot) : null)}
-                        onCancel={() => setEditingCell(null)}
-                        type="number"
-                        placeholder="—"
-                      />
-
-                      {/* Categoria / etiqueta — duplo clique abre mini-grid */}
-                      <td style={{ padding: '8px 10px', position: 'relative' }}>
-                        <div
-                          style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                          title="Duplo clique para selecionar etiqueta"
-                          onDoubleClick={e => openLabelPicker(acc.id, acc.platform.id, e)}
-                        >
-                          {currentLabel ? (
-                            <span className="badge" style={{ background: currentLabel.color + '22', color: currentLabel.color, borderColor: currentLabel.color + '55', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                              {currentLabel.name}
-                            </span>
-                          ) : (
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 3 }}>
-                              <Tag size={10} /> —
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Fornecedor */}
-                      <InlineCell
-                        value={vals.supplier}
-                        editing={editingCell?.accountId === acc.id && editingCell.field === 'supplier'}
-                        onEdit={() => setEditingCell({ accountId: acc.id, field: 'supplier' })}
-                        onChange={v => updateCellVal(acc.id, 'supplier', v)}
-                        onSave={() => saveField(acc.id, 'supplier', vals.supplier || null)}
-                        onCancel={() => setEditingCell(null)}
-                        placeholder="Fornecedor"
-                      />
-
-                      {/* Anotações */}
-                      <InlineCell
-                        value={vals.annotations}
-                        editing={editingCell?.accountId === acc.id && editingCell.field === 'annotations'}
-                        onEdit={() => setEditingCell({ accountId: acc.id, field: 'annotations' })}
-                        onChange={v => updateCellVal(acc.id, 'annotations', v)}
-                        onSave={() => saveField(acc.id, 'annotations', vals.annotations || null)}
-                        onCancel={() => setEditingCell(null)}
-                        placeholder="Anotações..."
-                      />
-
-                      {/* Progresso */}
-                      <td style={{ padding: '8px 10px' }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: pct === 100 ? '#22c55e' : 'var(--text-primary)', marginBottom: 2 }}>{pct}%</div>
-                        <div className="progress-bar">
-                          <div className="progress-fill" style={{ width: `${pct}%`, background: pct === 100 ? '#22c55e' : '#3b82f6' }} />
-                        </div>
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>{acc.completedDays}/{acc.totalDays}d</div>
-                      </td>
-
-                      {/* Open account */}
-                      <td style={{ padding: '8px 6px', textAlign: 'center' }}>
-                        <button
-                          className="btn btn-ghost"
-                          style={{ padding: '3px 5px' }}
-                          title="Abrir conta"
-                          onClick={() => router.push(`/account/${acc.id}`)}
-                        >
-                          <ExternalLink size={12} />
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+      {/* Table(s) */}
+      {loading ? (
+        <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Carregando...</div>
+      ) : platformGroups ? (
+        /* All platforms: one table per platform */
+        platformGroups.length === 0 ? (
+          <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Nenhuma conta encontrada.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {platformGroups.map(({ platform, accounts: groupAccounts }) => (
+              <div key={platform.id} className="card" style={{ overflow: 'hidden' }}>
+                {/* Platform header */}
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--background)' }}>
+                  <PlatformIcon name={platform.icon || 'default'} size={16} />
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>{platform.name}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 4 }}>{groupAccounts.length} conta{groupAccounts.length !== 1 ? 's' : ''}</span>
+                </div>
+                <AccountTable
+                  accounts={groupAccounts}
+                  cellValues={cellValues}
+                  editingCell={editingCell}
+                  hideSensitive={hideSensitive}
+                  showPlatformCol={false}
+                  labelsForPlatform={labelsForPlatform}
+                  setEditingCell={setEditingCell}
+                  updateCellVal={updateCellVal}
+                  saveField={saveField}
+                  openLabelPicker={openLabelPicker}
+                  isWhatsApp={isWhatsApp}
+                  router={router}
+                />
+              </div>
+            ))}
+          </div>
+        )
+      ) : (
+        /* Single platform filter */
+        <div className="card" style={{ overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            {filtered.length === 0 ? (
+              <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Nenhuma conta encontrada.</div>
+            ) : (
+              <AccountTable
+                accounts={filtered}
+                cellValues={cellValues}
+                editingCell={editingCell}
+                hideSensitive={hideSensitive}
+                showPlatformCol={false}
+                labelsForPlatform={labelsForPlatform}
+                setEditingCell={setEditingCell}
+                updateCellVal={updateCellVal}
+                saveField={saveField}
+                openLabelPicker={openLabelPicker}
+                isWhatsApp={isWhatsApp}
+                router={router}
+              />
+            )}
+          </div>
+          {filtered.length > 0 && (
+            <div style={{ padding: '6px 10px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>TOTAL</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{filtered.length} conta{filtered.length !== 1 ? 's' : ''}</span>
+            </div>
           )}
         </div>
-
-        {/* Footer */}
-        {!loading && (
-          <div style={{ padding: '6px 10px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              TOTAL
-            </span>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{filtered.length} conta{filtered.length !== 1 ? 's' : ''}</span>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Label grid popup */}
       {openLabelGrid && (
@@ -410,6 +279,214 @@ export default function PlanilhaGlobal() {
           onClose={() => { setShowLabelManager(false); loadData() }}
         />
       )}
+    </div>
+  )
+}
+
+/* ---- ACCOUNT TABLE ---- */
+function AccountTable({
+  accounts,
+  cellValues,
+  editingCell,
+  hideSensitive,
+  showPlatformCol,
+  labelsForPlatform,
+  setEditingCell,
+  updateCellVal,
+  saveField,
+  openLabelPicker,
+  isWhatsApp,
+  router,
+}: {
+  accounts: AccountRow[]
+  cellValues: Record<string, Record<string, string>>
+  editingCell: { accountId: string; field: string } | null
+  hideSensitive: boolean
+  showPlatformCol: boolean
+  labelsForPlatform: (platformId: string) => Label[]
+  setEditingCell: (v: { accountId: string; field: string } | null) => void
+  updateCellVal: (accountId: string, field: string, value: string) => void
+  saveField: (accountId: string, field: string, value: string | number | null) => void
+  openLabelPicker: (accountId: string, platformId: string, e: React.MouseEvent) => void
+  isWhatsApp: (a: AccountRow) => boolean
+  router: { push: (path: string) => void }
+}) {
+  const headers = showPlatformCol
+    ? ['#', 'Plataforma', 'Nome da Conta', 'Login / Email', 'Senha', 'Telefone', 'Slot', 'Categoria', 'Fornecedor', 'Anotações', 'Progresso', '']
+    : ['#', 'Nome da Conta', 'Login / Email', 'Senha', 'Telefone', 'Slot', 'Categoria', 'Fornecedor', 'Anotações', 'Progresso', '']
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: showPlatformCol ? 1200 : 1080 }}>
+        <colgroup>
+          <col style={{ width: 36 }} />
+          {showPlatformCol && <col style={{ width: 110 }} />}
+          <col style={{ width: 150 }} />
+          <col style={{ width: 160 }} />
+          <col style={{ width: 140 }} />
+          <col style={{ width: 130 }} />
+          <col style={{ width: 80 }} />
+          <col style={{ width: 120 }} />
+          <col style={{ width: 150 }} />
+          <col style={{ width: 160 }} />
+          <col style={{ width: 120 }} />
+          <col style={{ width: 40 }} />
+        </colgroup>
+        <thead>
+          <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
+            {headers.map((h, i) => (
+              <th key={i} style={{ padding: '8px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {accounts.map((acc, idx) => {
+            const vals = cellValues[acc.id] || {}
+            const pct = acc.totalDays ? Math.round((acc.completedDays / acc.totalDays) * 100) : 0
+            const platformLabels = labelsForPlatform(acc.platform.id)
+            const currentLabel = platformLabels.find(l => l.id === vals.categoryId) || acc.category
+            const wa = isWhatsApp(acc)
+
+            return (
+              <tr
+                key={acc.id}
+                style={{ borderBottom: '1px solid var(--border)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-hover)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <td style={{ padding: '8px 10px', fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>{idx + 1}</td>
+
+                {showPlatformCol && (
+                  <td style={{ padding: '8px 10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <PlatformIcon name={acc.platform.icon || 'default'} size={14} />
+                      <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{acc.platform.name}</span>
+                    </div>
+                  </td>
+                )}
+
+                <InlineCell
+                  value={vals.name}
+                  editing={editingCell?.accountId === acc.id && editingCell.field === 'name'}
+                  onEdit={() => setEditingCell({ accountId: acc.id, field: 'name' })}
+                  onChange={v => updateCellVal(acc.id, 'name', v)}
+                  onSave={() => saveField(acc.id, 'name', vals.name || null)}
+                  onCancel={() => setEditingCell(null)}
+                  placeholder="Nome"
+                  sensitive
+                  hidden={hideSensitive}
+                />
+
+                <InlineCell
+                  value={vals.username}
+                  editing={editingCell?.accountId === acc.id && editingCell.field === 'username'}
+                  onEdit={() => !wa && setEditingCell({ accountId: acc.id, field: 'username' })}
+                  onChange={v => updateCellVal(acc.id, 'username', v)}
+                  onSave={() => saveField(acc.id, 'username', vals.username || null)}
+                  onCancel={() => setEditingCell(null)}
+                  placeholder={wa ? '—' : 'email@exemplo.com'}
+                  disabled={wa}
+                  sensitive
+                  hidden={hideSensitive}
+                />
+
+                <InlineCell
+                  value={vals.password}
+                  editing={editingCell?.accountId === acc.id && editingCell.field === 'password'}
+                  onEdit={() => !wa && setEditingCell({ accountId: acc.id, field: 'password' })}
+                  onChange={v => updateCellVal(acc.id, 'password', v)}
+                  onSave={() => saveField(acc.id, 'password', vals.password || null)}
+                  onCancel={() => setEditingCell(null)}
+                  placeholder={wa ? '—' : 'Senha'}
+                  disabled={wa}
+                  sensitive
+                  hidden={hideSensitive}
+                />
+
+                <InlineCell
+                  value={vals.phone}
+                  editing={editingCell?.accountId === acc.id && editingCell.field === 'phone'}
+                  onEdit={() => setEditingCell({ accountId: acc.id, field: 'phone' })}
+                  onChange={v => updateCellVal(acc.id, 'phone', v)}
+                  onSave={() => saveField(acc.id, 'phone', vals.phone || null)}
+                  onCancel={() => setEditingCell(null)}
+                  placeholder="+55 11 99999-9999"
+                />
+
+                <InlineCell
+                  value={vals.slot}
+                  editing={editingCell?.accountId === acc.id && editingCell.field === 'slot'}
+                  onEdit={() => setEditingCell({ accountId: acc.id, field: 'slot' })}
+                  onChange={v => updateCellVal(acc.id, 'slot', v)}
+                  onSave={() => saveField(acc.id, 'slot', vals.slot ? Number(vals.slot) : null)}
+                  onCancel={() => setEditingCell(null)}
+                  type="number"
+                  placeholder="—"
+                />
+
+                <td style={{ padding: '8px 10px', position: 'relative' }}>
+                  <div
+                    style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                    title="Duplo clique para selecionar etiqueta"
+                    onDoubleClick={e => openLabelPicker(acc.id, acc.platform.id, e)}
+                  >
+                    {currentLabel ? (
+                      <span className="badge" style={{ background: currentLabel.color + '22', color: currentLabel.color, borderColor: currentLabel.color + '55', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        {currentLabel.name}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Tag size={10} /> —
+                      </span>
+                    )}
+                  </div>
+                </td>
+
+                <InlineCell
+                  value={vals.supplier}
+                  editing={editingCell?.accountId === acc.id && editingCell.field === 'supplier'}
+                  onEdit={() => setEditingCell({ accountId: acc.id, field: 'supplier' })}
+                  onChange={v => updateCellVal(acc.id, 'supplier', v)}
+                  onSave={() => saveField(acc.id, 'supplier', vals.supplier || null)}
+                  onCancel={() => setEditingCell(null)}
+                  placeholder="Fornecedor"
+                />
+
+                <InlineCell
+                  value={vals.annotations}
+                  editing={editingCell?.accountId === acc.id && editingCell.field === 'annotations'}
+                  onEdit={() => setEditingCell({ accountId: acc.id, field: 'annotations' })}
+                  onChange={v => updateCellVal(acc.id, 'annotations', v)}
+                  onSave={() => saveField(acc.id, 'annotations', vals.annotations || null)}
+                  onCancel={() => setEditingCell(null)}
+                  placeholder="Anotações..."
+                />
+
+                <td style={{ padding: '8px 10px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: pct === 100 ? '#22c55e' : 'var(--text-primary)', marginBottom: 2 }}>{pct}%</div>
+                  <div className="progress-bar">
+                    <div className="progress-fill" style={{ width: `${pct}%`, background: pct === 100 ? '#22c55e' : '#3b82f6' }} />
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>{acc.completedDays}/{acc.totalDays}d</div>
+                </td>
+
+                <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+                  <button
+                    className="btn btn-ghost"
+                    style={{ padding: '3px 5px' }}
+                    title="Abrir conta"
+                    onClick={() => router.push(`/account/${acc.id}`)}
+                  >
+                    <ExternalLink size={12} />
+                  </button>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }

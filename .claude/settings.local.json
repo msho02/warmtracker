@@ -48,7 +48,15 @@
       "Bash(powershell -Command \"Stop-Process -Name node -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2; Set-Location 'c:\\\\Users\\\\mathe\\\\OneDrive\\\\Área de Trabalho\\\\warmtracker'; node node_modules/prisma/build/index.js generate\")",
       "Bash(npx tsc *)",
       "Bash(npx next *)",
-      "Bash(npx prisma *)"
+      "Bash(npx prisma *)",
+      "Bash(node -e ' *)",
+      "Bash(mkdir -p \"c:/Users/mathe/OneDrive/Área de Trabalho/warmtracker/app/\\(main\\)/platform/[id]\")",
+      "Bash(mkdir -p \"c:/Users/mathe/OneDrive/Área de Trabalho/warmtracker/app/\\(main\\)/account/[id]\")",
+      "Bash(rm \"c:/Users/mathe/OneDrive/Área de Trabalho/warmtracker/app/platform/[id]/page.tsx\")",
+      "Bash(rm \"c:/Users/mathe/OneDrive/Área de Trabalho/warmtracker/app/account/[id]/page.tsx\")",
+      "Bash(rmdir \"c:/Users/mathe/OneDrive/Área de Trabalho/warmtracker/app/platform/[id]\")",
+      "Bash(rmdir \"c:/Users/mathe/OneDrive/Área de Trabalho/warmtracker/app/account/[id]\")",
+      "Bash(npm run *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\mathe\\OneDrive\\Área de Trabalho\\warmtracker",
