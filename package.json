@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node node_modules/next/dist/bin/next dev",
-    "build": "prisma generate && prisma db push --accept-data-loss && node node_modules/next/dist/bin/next build",
+    "build": "prisma generate && node node_modules/next/dist/bin/next build",
     "start": "node node_modules/next/dist/bin/next start",
     "lint": "node node_modules/next/dist/bin/next lint",
     "db:push": "node node_modules/prisma/build/index.js db push",
@@ -12,8 +12,6 @@
     "db:studio": "node node_modules/prisma/build/index.js studio"
   },
   "dependencies": {
-    "@libsql/client": "^0.17.3",
-    "@prisma/adapter-libsql": "^7.8.0",
     "@prisma/client": "^5.22.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
